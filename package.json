@@ -1,5 +1,5 @@
 {
-  "name": "cxcg",
+  "name": "@nolann-dev/cxcg",
   "version": "0.1.0",
   "description": "Local web board for inspecting and editing Codex config.toml files.",
   "type": "module",

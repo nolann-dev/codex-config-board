@@ -9,7 +9,7 @@ cxcg runs a local API and React UI for managing `config.toml` files used by Code
 Run the app without cloning this repo:
 
 ```bash
-npx cxcg
+npx @nolann-dev/cxcg
 ```
 
 The command prints a local URL with a generated token:
@@ -23,18 +23,18 @@ Open that URL in your browser. Keep the token in the URL because API requests ar
 Useful CLI options:
 
 ```bash
-npx cxcg --open
-npx cxcg --codex-home ~/.codex
-npx cxcg --api-port 1455
-npx cxcg --host 127.0.0.1
-npx cxcg --no-open
-npx cxcg --help
+npx @nolann-dev/cxcg --open
+npx @nolann-dev/cxcg --codex-home ~/.codex
+npx @nolann-dev/cxcg --api-port 1455
+npx @nolann-dev/cxcg --host 127.0.0.1
+npx @nolann-dev/cxcg --no-open
+npx @nolann-dev/cxcg --help
 ```
 
-The package name is short for Codex config. The primary executable is `cxcg`, and the package also installs a `cxconfig` alias for readability.
+The npm package is scoped because npm blocks the unscoped `cxcg` package name as too similar to existing packages. The primary executable is still `cxcg`, and the package also installs a `cxconfig` alias for readability.
 
 ```bash
-npm install -g cxcg
+npm install -g @nolann-dev/cxcg
 cxcg
 ```
 
