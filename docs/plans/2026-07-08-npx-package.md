@@ -1,8 +1,8 @@
-# cxconfig npx Package Implementation Plan
+# cxcg npx Package Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Publish this local Codex config board as an npm package that can run with `npx cxconfig`.
+**Goal:** Publish this local Codex config board as an npm package that can run with `npx cxcg`.
 
 **Architecture:** Keep the existing pnpm monorepo development flow, but add a production CLI entrypoint that starts the Hono API and serves the built React UI from package files. Bundle the server-side TypeScript into one npm binary so consumers do not need the workspace source layout.
 
@@ -24,15 +24,15 @@ Add optional static UI serving to `createApp` and a production CLI that parses s
 - Modify: `package.json`
 - Modify: `.gitignore`
 
-Rename the publish package to `cxconfig`, expose a `cxconfig` binary, build the web bundle, bundle the CLI with esbuild, and publish only the compiled CLI, UI assets, README, and package metadata.
+Rename the publish package to `cxcg`, expose `cxcg` and `cxconfig` binaries, build the web bundle, bundle the CLI with esbuild, and publish only the compiled CLI, UI assets, README, and package metadata.
 
 ### Task 3: README Quick Start
 
 **Files:**
 - Modify: `README.md`
 
-Document `npx cxconfig`, CLI flags, npm login/publish flow, and keep local development commands separate from consumer quick start.
+Document `npx cxcg`, CLI flags, npm login/publish flow, and keep local development commands separate from consumer quick start.
 
 ### Task 4: Verification
 
-Run `pnpm typecheck`, `pnpm test`, `pnpm build`, `npm pack --dry-run`, install/run the packed tarball through `npx --yes ./cxconfig-*.tgz --no-open --api-port <port>`, verify the served page responds, then publish with `npm publish --access public`.
+Run `pnpm typecheck`, `pnpm test`, `pnpm build`, `npm pack --dry-run`, install/run the packed tarball through `npx --yes ./cxcg-*.tgz --no-open --api-port <port>`, verify the served page responds, then publish with `npm publish --access public`.

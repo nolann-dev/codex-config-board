@@ -145,12 +145,12 @@ async function readVersion(): Promise<string> {
 }
 
 function printHelp() {
-  console.log(`cxconfig
+  console.log(`cxcg
 
 Run Codex Config Board locally.
 
 Usage:
-  cxconfig [options]
+  cxcg [options]
 
 Options:
   -p, --api-port <port>   API and UI port. Defaults to 1455.
@@ -164,7 +164,7 @@ Options:
 }
 
 main().catch((error) => {
-  const message = error instanceof Error ? error.message : "Unable to start cxconfig";
-  console.error(`cxconfig: ${message}`);
+  const message = error instanceof Error ? error.message : "Unable to start cxcg";
+  console.error(`cxcg: ${message}`);
   process.exit(1);
 });

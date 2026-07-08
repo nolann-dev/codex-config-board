@@ -1,15 +1,15 @@
-# cxconfig
+# cxcg
 
 A local web board for inspecting and editing Codex configuration files.
 
-cxconfig runs a local API and React UI for managing `config.toml` files used by Codex. It is designed for fast local workflows: scan config files, inspect effective values, edit common fields through forms, keep raw TOML available, and restore from backups when needed.
+cxcg runs a local API and React UI for managing `config.toml` files used by Codex. It is designed for fast local workflows: scan config files, inspect effective values, edit common fields through forms, keep raw TOML available, and restore from backups when needed.
 
 ## Quick Start
 
 Run the app without cloning this repo:
 
 ```bash
-npx cxconfig
+npx cxcg
 ```
 
 The command prints a local URL with a generated token:
@@ -23,12 +23,19 @@ Open that URL in your browser. Keep the token in the URL because API requests ar
 Useful CLI options:
 
 ```bash
-npx cxconfig --open
-npx cxconfig --codex-home ~/.codex
-npx cxconfig --api-port 1455
-npx cxconfig --host 127.0.0.1
-npx cxconfig --no-open
-npx cxconfig --help
+npx cxcg --open
+npx cxcg --codex-home ~/.codex
+npx cxcg --api-port 1455
+npx cxcg --host 127.0.0.1
+npx cxcg --no-open
+npx cxcg --help
+```
+
+The package name is short for Codex config. The primary executable is `cxcg`, and the package also installs a `cxconfig` alias for readability.
+
+```bash
+npm install -g cxcg
+cxcg
 ```
 
 The app is local-first and binds to `127.0.0.1` by default.

@@ -1,10 +1,11 @@
 {
-  "name": "cxconfig",
+  "name": "cxcg",
   "version": "0.1.0",
   "description": "Local web board for inspecting and editing Codex config.toml files.",
   "type": "module",
   "packageManager": "pnpm@10.17.1",
   "bin": {
+    "cxcg": "dist/cli.js",
     "cxconfig": "dist/cli.js"
   },
   "files": [
