@@ -13,7 +13,7 @@ const token = randomBytes(24).toString("base64url");
 const codexHome = process.env.CODEX_HOME ?? join(homedir(), ".codex");
 const appHome = join(homedir(), ".codex-config-board");
 const backupDir = join(appHome, "backups");
-const databasePath = join(appHome, "state.sqlite");
+const databasePath = join(appHome, "state.json");
 
 const app = createApp({
   token,

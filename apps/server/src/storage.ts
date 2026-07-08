@@ -1,17 +1,5 @@
-import { mkdirSync } from "node:fs";
-import { createRequire } from "node:module";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-
-const require = createRequire(import.meta.url);
-const { DatabaseSync } = require("node:sqlite") as {
-  DatabaseSync: new (path: string) => {
-    exec(sql: string): void;
-    prepare(sql: string): {
-      run(...values: unknown[]): void;
-      all(): unknown[];
-    };
-  };
-};
 
 export type BackupRecord = {
   id: number;
@@ -26,54 +14,100 @@ export type Storage = {
   listBackups(): BackupRecord[];
 };
 
+type StorageState = {
+  recentProjects: Record<string, { lastOpenedAt: string }>;
+  backups: BackupRecord[];
+  nextBackupId: number;
+};
+
 export function createStorage(databasePath: string): Storage {
+  let state = readState(databasePath);
+
+  function save() {
+    if (databasePath === ":memory:") return;
+    mkdirSync(dirname(databasePath), { recursive: true });
+    const tempPath = `${databasePath}.tmp`;
+    writeFileSync(tempPath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+    renameSync(tempPath, databasePath);
+  }
+
+  return {
+    rememberProject(projectPath: string) {
+      state.recentProjects[projectPath] = { lastOpenedAt: new Date().toISOString() };
+      save();
+    },
+
+    recordBackup(input: { targetPath: string; backupPath: string }) {
+      state.backups.unshift({
+        id: state.nextBackupId,
+        targetPath: input.targetPath,
+        backupPath: input.backupPath,
+        createdAt: new Date().toISOString(),
+      });
+      state.nextBackupId += 1;
+      save();
+    },
+
+    listBackups(): BackupRecord[] {
+      return [...state.backups].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    },
+  };
+}
+
+function readState(databasePath: string): StorageState {
+  if (databasePath === ":memory:") {
+    return emptyState();
+  }
+
   if (databasePath !== ":memory:") {
     mkdirSync(dirname(databasePath), { recursive: true });
   }
 
-  const db = new DatabaseSync(databasePath);
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS recent_projects (
-      path TEXT PRIMARY KEY,
-      last_opened_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS backups (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      target_path TEXT NOT NULL,
-      backup_path TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
-  `);
+  if (!existsSync(databasePath)) {
+    return emptyState();
+  }
 
+  try {
+    const parsed = JSON.parse(readFileSync(databasePath, "utf8")) as Partial<StorageState>;
+    const backups = Array.isArray(parsed.backups) ? parsed.backups.filter(isBackupRecord) : [];
+    const maxBackupId = backups.reduce((maxId, backup) => Math.max(maxId, backup.id), 0);
+    return {
+      recentProjects: isRecord(parsed.recentProjects) ? normalizeRecentProjects(parsed.recentProjects) : {},
+      backups,
+      nextBackupId: Math.max(Number(parsed.nextBackupId) || 1, maxBackupId + 1),
+    };
+  } catch {
+    return emptyState();
+  }
+}
+
+function emptyState(): StorageState {
   return {
-    rememberProject(projectPath: string) {
-      db.prepare(
-        `INSERT INTO recent_projects (path, last_opened_at)
-         VALUES (?, ?)
-         ON CONFLICT(path) DO UPDATE SET last_opened_at = excluded.last_opened_at`,
-      ).run(projectPath, new Date().toISOString());
-    },
-
-    recordBackup(input: { targetPath: string; backupPath: string }) {
-      db.prepare(
-        `INSERT INTO backups (target_path, backup_path, created_at)
-         VALUES (?, ?, ?)`,
-      ).run(input.targetPath, input.backupPath, new Date().toISOString());
-    },
-
-    listBackups(): BackupRecord[] {
-      return db
-        .prepare(`SELECT id, target_path, backup_path, created_at FROM backups ORDER BY created_at DESC`)
-        .all()
-        .map((row) => {
-          const record = row as Record<string, unknown>;
-          return {
-            id: Number(record.id),
-            targetPath: String(record.target_path),
-            backupPath: String(record.backup_path),
-            createdAt: String(record.created_at),
-          };
-        });
-    },
+    recentProjects: {},
+    backups: [],
+    nextBackupId: 1,
   };
+}
+
+function normalizeRecentProjects(input: Record<string, unknown>): StorageState["recentProjects"] {
+  const output: StorageState["recentProjects"] = {};
+  for (const [path, value] of Object.entries(input)) {
+    const record = isRecord(value) ? value : {};
+    output[path] = { lastOpenedAt: typeof record.lastOpenedAt === "string" ? record.lastOpenedAt : new Date().toISOString() };
+  }
+  return output;
+}
+
+function isBackupRecord(value: unknown): value is BackupRecord {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "number" &&
+    typeof value.targetPath === "string" &&
+    typeof value.backupPath === "string" &&
+    typeof value.createdAt === "string"
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

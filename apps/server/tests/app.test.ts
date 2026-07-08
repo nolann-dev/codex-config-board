@@ -9,7 +9,7 @@ async function fixture(name: string) {
   const codexHome = join(root, "codex-home");
   const projectPath = join(root, "project");
   const backupDir = join(root, "backups");
-  const databasePath = join(root, "state.sqlite");
+  const databasePath = join(root, "state.json");
   await mkdir(join(projectPath, ".codex"), { recursive: true });
   await mkdir(codexHome, { recursive: true });
   await writeFile(join(codexHome, "config.toml"), "model = \"gpt-5.4\"\n");

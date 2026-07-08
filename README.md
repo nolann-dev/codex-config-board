@@ -84,7 +84,7 @@ docs/
 
 ## Requirements
 
-- Node.js 22 or newer
+- Node.js 20 or newer
 - Codex config files under `~/.codex` or project `.codex/config.toml`
 
 Development also requires pnpm 10.

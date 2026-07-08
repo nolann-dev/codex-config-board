@@ -1,6 +1,6 @@
 {
   "name": "@nolann-dev/cxcg",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local web board for inspecting and editing Codex config.toml files.",
   "type": "module",
   "packageManager": "pnpm@10.17.1",
@@ -14,7 +14,7 @@
     "README.md"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=20"
   },
   "license": "MIT",
   "repository": {
@@ -28,7 +28,7 @@
   "scripts": {
     "dev": "pnpm --filter @codex-config-board/server dev",
     "build": "pnpm -r build && pnpm build:cli",
-    "build:cli": "esbuild apps/server/src/cli.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/cli.js --banner:js='import { createRequire as __cxCreateRequire } from \"node:module\"; const require = __cxCreateRequire(import.meta.url);' --external:node:* && chmod +x dist/cli.js",
+    "build:cli": "esbuild apps/server/src/cli.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/cli.js --banner:js='import { createRequire as __cxCreateRequire } from \"node:module\"; const require = __cxCreateRequire(import.meta.url);' --external:node:* && chmod +x dist/cli.js",
     "start": "node dist/cli.js",
     "pack:dry-run": "npm pack --dry-run",
     "typecheck": "pnpm -r typecheck",

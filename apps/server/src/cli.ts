@@ -35,7 +35,7 @@ async function main() {
   const token = randomBytes(24).toString("base64url");
   const appHome = join(homedir(), ".codex-config-board");
   const backupDir = join(appHome, "backups");
-  const databasePath = join(appHome, "state.sqlite");
+  const databasePath = join(appHome, "state.json");
   const { createApp } = await import("./app");
   const app = createApp({
     token,
