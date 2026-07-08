@@ -138,6 +138,31 @@ npm pack --dry-run
 
 ## Publish
 
+Publishing is automated by GitHub Actions when changes are pushed or merged to the `release` branch.
+
+Before using the workflow, create an npm token and add it to the GitHub repository:
+
+1. In npm, create an Automation token or a granular token that can publish `@nolann-dev/cxcg`.
+2. In GitHub, open this repository's Settings, then Secrets and variables, then Actions.
+3. Add a repository secret named `NPM_TOKEN` with the npm token value.
+
+Release flow:
+
+```bash
+pnpm typecheck
+pnpm test
+pnpm build
+npm version patch
+git push origin main
+git checkout release
+git merge main
+git push origin release
+```
+
+The workflow installs dependencies, typechecks, tests, builds, verifies the current package version is not already published, then runs `npm publish --access public`.
+
+Manual local publishing is still possible:
+
 ```bash
 npm login
 pnpm build
