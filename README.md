@@ -1,8 +1,37 @@
-# Codex Config Board
+# cxconfig
 
 A local web board for inspecting and editing Codex configuration files.
 
-Codex Config Board is a TypeScript monorepo that runs a local API and React UI for managing `config.toml` files used by Codex. It is designed for fast local workflows: scan config files, inspect effective values, edit common fields through forms, keep raw TOML available, and restore from backups when needed.
+cxconfig runs a local API and React UI for managing `config.toml` files used by Codex. It is designed for fast local workflows: scan config files, inspect effective values, edit common fields through forms, keep raw TOML available, and restore from backups when needed.
+
+## Quick Start
+
+Run the app without cloning this repo:
+
+```bash
+npx cxconfig
+```
+
+The command prints a local URL with a generated token:
+
+```text
+Codex Config Board: http://127.0.0.1:1455/?token=...
+```
+
+Open that URL in your browser. Keep the token in the URL because API requests are token-protected.
+
+Useful CLI options:
+
+```bash
+npx cxconfig --open
+npx cxconfig --codex-home ~/.codex
+npx cxconfig --api-port 1455
+npx cxconfig --host 127.0.0.1
+npx cxconfig --no-open
+npx cxconfig --help
+```
+
+The app is local-first and binds to `127.0.0.1` by default.
 
 ## Features
 
@@ -49,12 +78,11 @@ docs/
 ## Requirements
 
 - Node.js 22 or newer
-- pnpm 10
 - Codex config files under `~/.codex` or project `.codex/config.toml`
 
-The app is local-first and binds to `127.0.0.1`. API calls require a generated token printed when the dev server starts.
+Development also requires pnpm 10.
 
-## Install
+## Development Install
 
 ```bash
 pnpm install
@@ -74,6 +102,13 @@ Codex Config Board UI: http://127.0.0.1:5173/?token=...
 
 Open that URL in your browser. Keep the token in the URL because API requests are token-protected.
 
+For the production CLI build:
+
+```bash
+pnpm build
+pnpm start -- --open
+```
+
 ## Useful Environment Variables
 
 ```bash
@@ -91,6 +126,16 @@ pnpm typecheck
 pnpm test
 pnpm build
 pnpm lint
+npm pack --dry-run
+```
+
+## Publish
+
+```bash
+npm login
+pnpm build
+npm pack --dry-run
+npm publish --access public
 ```
 
 ## Safety Notes
@@ -104,4 +149,3 @@ pnpm lint
 ## Current Scope
 
 This is an early local tool. It focuses on common Codex config fields and preserves unknown TOML so future Codex settings are not discarded. The schema package should be updated as Codex adds new documented config options.
-

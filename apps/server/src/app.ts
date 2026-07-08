@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { extname, isAbsolute, join, normalize } from "node:path";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import {
@@ -18,6 +20,7 @@ export type AppOptions = {
   databasePath: string;
   systemConfigPath?: string;
   defaultScanRoot?: string;
+  staticRoot?: string;
 };
 
 type PreviewBody = {
@@ -145,7 +148,67 @@ export function createApp(options: AppOptions) {
     return c.json({ ok: true, backupPath });
   });
 
+  const staticRoot = options.staticRoot;
+  if (staticRoot) {
+    app.get("*", async (c) => {
+      const url = new URL(c.req.url);
+      if (url.pathname.startsWith("/api/")) {
+        return c.notFound();
+      }
+
+      const filePath = resolveStaticPath(staticRoot, url.pathname);
+      if (!filePath) {
+        return c.notFound();
+      }
+
+      try {
+        const bytes = await readFile(filePath);
+        return c.body(bytes, 200, { "Content-Type": contentTypeFor(filePath) });
+      } catch {
+        const indexPath = join(staticRoot, "index.html");
+        const bytes = await readFile(indexPath);
+        return c.body(bytes, 200, { "Content-Type": "text/html; charset=utf-8" });
+      }
+    });
+  }
+
   return app;
+}
+
+function resolveStaticPath(staticRoot: string, pathname: string): string | undefined {
+  const relativePath = pathname === "/" ? "index.html" : decodeURIComponent(pathname).replace(/^\/+/, "");
+  const normalized = normalize(relativePath);
+  if (normalized.startsWith("..") || isAbsolute(normalized)) {
+    return undefined;
+  }
+  return join(staticRoot, normalized);
+}
+
+function contentTypeFor(filePath: string): string {
+  switch (extname(filePath)) {
+    case ".css":
+      return "text/css; charset=utf-8";
+    case ".html":
+      return "text/html; charset=utf-8";
+    case ".ico":
+      return "image/x-icon";
+    case ".js":
+      return "text/javascript; charset=utf-8";
+    case ".json":
+      return "application/json; charset=utf-8";
+    case ".map":
+      return "application/json; charset=utf-8";
+    case ".png":
+      return "image/png";
+    case ".svg":
+      return "image/svg+xml";
+    case ".wasm":
+      return "application/wasm";
+    case ".woff2":
+      return "font/woff2";
+    default:
+      return "application/octet-stream";
+  }
 }
 
 function isLoopbackOrigin(origin: string): boolean {
