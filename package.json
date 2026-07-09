@@ -1,6 +1,6 @@
 {
   "name": "@nolann-dev/cxcg",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Local web board for inspecting and editing Codex config.toml files.",
   "type": "module",
   "packageManager": "pnpm@10.17.1",

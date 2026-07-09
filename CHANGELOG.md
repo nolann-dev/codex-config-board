@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.2 - 2026-07-09
 
 - Added a dedicated Codex cheatsheet screen with searchable keyboard shortcuts and slash commands.
 - Split the cheatsheet into Radix primitive tabs for keyboard shortcuts and slash commands.
