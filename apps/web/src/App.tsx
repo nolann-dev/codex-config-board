@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import Editor from "@monaco-editor/react";
-import { Checkbox, Select, Switch, Table, Tabs, TextArea, TextField } from "@radix-ui/themes";
+import * as PrimitiveTabs from "@radix-ui/react-tabs";
+import * as Toast from "@radix-ui/react-toast";
+import { Card as ThemeCard, Checkbox, Inset, Select, Separator, Switch, Table, Tabs, TextArea, TextField } from "@radix-ui/themes";
 import {
   createColumnHelper,
   flexRender,
@@ -116,6 +118,11 @@ type KeymapActionDescriptor = {
   label: string;
   description: string;
   defaultBinding: string;
+};
+
+type SlashCommandDescriptor = {
+  command: string;
+  description: string;
 };
 
 const booleanSelectOptions = [
@@ -318,14 +325,64 @@ const keymapActions: KeymapActionDescriptor[] = [
   km("approval", "Approval", "cancel", "Cancel an elicitation request.", "c"),
 ];
 
+const slashCommands: SlashCommandDescriptor[] = [
+  sc("/permissions", "Set what Codex can do without asking first."),
+  sc("/ide", "Include open files, selections, and other IDE context."),
+  sc("/keymap", "Inspect and remap TUI keyboard shortcuts."),
+  sc("/vim", "Toggle Vim composer mode."),
+  sc("/sandbox-add-read-dir", "Grant Windows sandbox read access to an extra directory."),
+  sc("/agent", "Switch the active agent thread."),
+  sc("/apps", "Browse apps and insert them into the prompt."),
+  sc("/plugins", "Browse installed and discoverable plugins."),
+  sc("/hooks", "View and manage lifecycle hooks."),
+  sc("/clear", "Clear the terminal and start a fresh chat."),
+  sc("/archive", "Archive the current session and exit."),
+  sc("/delete", "Permanently delete the current session and exit."),
+  sc("/compact", "Summarize the conversation to free tokens."),
+  sc("/copy", "Copy the latest completed Codex output."),
+  sc("/diff", "Show the Git diff, including untracked files."),
+  sc("/exit", "Exit the CLI, same as /quit."),
+  sc("/experimental", "Toggle experimental features."),
+  sc("/approve", "Approve one retry of a recent auto-review denial."),
+  sc("/memories", "Configure memory use and generation."),
+  sc("/skills", "Browse and use skills."),
+  sc("/import", "Import supported Claude Code setup and artifacts."),
+  sc("/feedback", "Send logs and feedback."),
+  sc("/init", "Generate an AGENTS.md scaffold."),
+  sc("/logout", "Sign out and clear local credentials."),
+  sc("/mcp", "List configured MCP tools."),
+  sc("/mention", "Attach a file or folder to the conversation."),
+  sc("/model", "Choose the active model and reasoning effort."),
+  sc("/fast", "Toggle the current model fast tier when available."),
+  sc("/plan", "Switch to plan mode with an optional prompt."),
+  sc("/goal", "Set, view, pause, resume, or clear a task goal."),
+  sc("/personality", "Choose a response communication style."),
+  sc("/ps", "Show background terminals and recent output."),
+  sc("/stop", "Stop all background terminals."),
+  sc("/fork", "Fork the current conversation into a new thread."),
+  sc("/side", "Start an ephemeral side conversation."),
+  sc("/btw", "Alias for starting a side conversation."),
+  sc("/raw", "Toggle raw scrollback mode."),
+  sc("/resume", "Resume a saved conversation."),
+  sc("/new", "Start a new conversation in the same CLI session."),
+  sc("/quit", "Exit the CLI."),
+  sc("/review", "Ask Codex to review the working tree."),
+  sc("/status", "Display session configuration and token usage."),
+  sc("/usage", "View account token usage or reset options."),
+  sc("/debug-config", "Print config layer and requirements diagnostics."),
+  sc("/statusline", "Configure TUI status-line fields interactively."),
+  sc("/title", "Configure terminal title fields interactively."),
+  sc("/theme", "Choose a syntax-highlighting theme."),
+];
+
 const keymapContextOptions = [...new Map(keymapActions.map((action) => [action.context, action.contextLabel])).entries()].map(
   ([value, label]) => ({ value, label }),
 );
-
 export function App() {
   const route = window.location.pathname;
   const searchParams = new URLSearchParams(window.location.search);
   const isEditPage = route === "/edit";
+  const isCheatsheetPage = route === "/cheatsheet";
   const requestedTarget = searchParams.get("target") === "project" ? "project" : "user";
   const [projectPath, setProjectPath] = useState("");
   const [session, setSession] = useState<SessionInfo | undefined>();
@@ -339,9 +396,11 @@ export function App() {
   const [formErrors, setFormErrors] = useState<FormErrorMap>({});
   const [preview, setPreview] = useState<PreviewResult | undefined>();
   const [status, setStatus] = useState("Loading local Codex config");
+  const [isConfigLoading, setIsConfigLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<ConfigTab>("model");
   const [navOpen, setNavOpen] = useState(() => defaultSidePanelsOpen());
   const [inspectorOpen, setInspectorOpen] = useState(() => defaultSidePanelsOpen());
+  const loadingRequestIdRef = useRef(0);
 
   useEffect(() => {
     void loadBoard(projectPath);
@@ -353,29 +412,40 @@ export function App() {
   const selectedLayer = layers.find((layer) => layer.path === selectedPath);
 
   async function loadBoard(nextProjectPath: string) {
+    const loadingRequestId = loadingRequestIdRef.current + 1;
+    loadingRequestIdRef.current = loadingRequestId;
+    setIsConfigLoading(true);
     setStatus("Loading local Codex config");
-    const query = nextProjectPath ? `?projectPath=${encodeURIComponent(nextProjectPath)}` : "";
-    const scanQuery = nextProjectPath ? `?rootPath=${encodeURIComponent(nextProjectPath)}` : "";
-    const [sessionJson, layersJson, effectiveJson, backupsJson, scanJson] = await Promise.all([
-      apiGet<SessionInfo>("/api/session"),
-      apiGet<{ layers: ConfigLayer[] }>(`/api/config/layers${query}`),
-      apiGet<EffectiveConfig>(`/api/config/effective${query}`),
-      apiGet<{ backups: BackupRecord[] }>("/api/backups"),
-      apiGet<{ files: ScannedConfigFile[] }>(`/api/config/scan${scanQuery}`),
-    ]);
-    setSession(sessionJson);
-    setLayers(layersJson.layers);
-    setEffective(effectiveJson);
-    setBackups(backupsJson.backups);
-    setScannedConfigs(scanJson.files);
-    const requestedLayer = layersJson.layers.find((layer) => layer.kind === requestedTarget);
-    const firstEditable = requestedLayer ?? layersJson.layers.find((layer) => layer.kind === "project" || layer.kind === "user");
-    setSelectedPath(firstEditable?.path ?? "");
-    setEditorText(firstEditable?.text ?? "");
-    setFormValues(toFormValues(firstEditable?.data ?? {}, fields));
-    setFormErrors({});
-    setPreview(undefined);
-    setStatus("Ready");
+    try {
+      const query = nextProjectPath ? `?projectPath=${encodeURIComponent(nextProjectPath)}` : "";
+      const scanQuery = nextProjectPath ? `?rootPath=${encodeURIComponent(nextProjectPath)}` : "";
+      const [sessionJson, layersJson, effectiveJson, backupsJson, scanJson] = await Promise.all([
+        apiGet<SessionInfo>("/api/session"),
+        apiGet<{ layers: ConfigLayer[] }>(`/api/config/layers${query}`),
+        apiGet<EffectiveConfig>(`/api/config/effective${query}`),
+        apiGet<{ backups: BackupRecord[] }>("/api/backups"),
+        apiGet<{ files: ScannedConfigFile[] }>(`/api/config/scan${scanQuery}`),
+      ]);
+      setSession(sessionJson);
+      setLayers(layersJson.layers);
+      setEffective(effectiveJson);
+      setBackups(backupsJson.backups);
+      setScannedConfigs(scanJson.files);
+      const requestedLayer = layersJson.layers.find((layer) => layer.kind === requestedTarget);
+      const firstEditable = requestedLayer ?? layersJson.layers.find((layer) => layer.kind === "project" || layer.kind === "user");
+      setSelectedPath(firstEditable?.path ?? "");
+      setEditorText(firstEditable?.text ?? "");
+      setFormValues(toFormValues(firstEditable?.data ?? {}, fields));
+      setFormErrors({});
+      setPreview(undefined);
+      setStatus("Ready");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to load Codex config");
+    } finally {
+      if (loadingRequestIdRef.current === loadingRequestId) {
+        setIsConfigLoading(false);
+      }
+    }
   }
 
   function selectLayer(path: string) {
@@ -453,6 +523,12 @@ export function App() {
 
   return (
     <div className={shellClassName} data-testid="app-shell">
+      {isConfigLoading ? (
+        <div className="top-loading-indicator" role="status" aria-label="Loading config" aria-live="polite">
+          <span className="top-loading-track" />
+          <span className="screen-reader-only">Loading Codex config</span>
+        </div>
+      ) : null}
       <aside className="sidebar" aria-label="Main navigation">
         <div className="brand">
           <div className="brand-mark">
@@ -461,16 +537,20 @@ export function App() {
           <span>Config Board</span>
         </div>
         <nav className="nav-list" aria-label="Primary">
-          <TextLink className={`nav-item ${!isEditPage ? "active" : ""}`} href={withToken("/")}>
+          <TextLink className={`nav-item ${!isEditPage && !isCheatsheetPage ? "active" : ""}`} href={withToken("/")}>
             <Layers3 size={16} /> Board
           </TextLink>
           <TextLink className={`nav-item ${isEditPage ? "active" : ""}`} href={editHref(requestedTarget)}>
             <Settings2 size={16} /> Editor
           </TextLink>
+          <TextLink className={`nav-item ${isCheatsheetPage ? "active" : ""}`} href={withToken("/cheatsheet")}>
+            <Search size={16} /> Cheatsheet
+          </TextLink>
           <TextLink className="nav-item" href="#diagnostics">
             <ShieldCheck size={16} /> Diagnostics
           </TextLink>
         </nav>
+        <NavigationCheatsheet />
       </aside>
 
       <main className="main">
@@ -490,7 +570,9 @@ export function App() {
             <PanelRight size={16} /> Inspector
           </Button>
         </div>
-        {isEditPage ? (
+        {isCheatsheetPage ? (
+          <CheatsheetPage />
+        ) : isEditPage ? (
           <EditPage
             activeTab={activeTab}
             editorText={editorText}
@@ -581,6 +663,197 @@ export function App() {
         />
       ) : null}
     </div>
+  );
+}
+
+function NavigationCheatsheet() {
+  return (
+    <section className="nav-cheatsheet" aria-label="Codex cheatsheet">
+      <div className="nav-cheatsheet-header">
+        <span>Cheatsheet</span>
+        <Badge tone="neutral">{keymapActions.length + slashCommands.length}</Badge>
+      </div>
+      <p className="nav-cheatsheet-copy">Search keyboard shortcuts and slash commands in one place.</p>
+      <div className="nav-cheatsheet-counts">
+        <Badge tone="neutral">{keymapActions.length} shortcuts</Badge>
+        <Badge tone="neutral">{slashCommands.length} commands</Badge>
+      </div>
+      <TextLink className="edit-link nav-cheatsheet-link" href={withToken("/cheatsheet")}>
+        <Search size={15} /> Open cheatsheet
+      </TextLink>
+    </section>
+  );
+}
+
+function CheatsheetPage() {
+  const [cheatsheetSearch, setCheatsheetSearch] = useState("");
+  const [copiedCommand, setCopiedCommand] = useState("");
+  const [toastOpen, setToastOpen] = useState(false);
+  const normalizedSearch = normalizeSearchQuery(cheatsheetSearch);
+  const filteredKeymapActions = useMemo(
+    () => keymapActions.filter((action) => matchesKeymapAction(action, normalizedSearch)),
+    [normalizedSearch],
+  );
+  const filteredSlashCommands = useMemo(
+    () => slashCommands.filter((command) => matchesSlashCommand(command, normalizedSearch)),
+    [normalizedSearch],
+  );
+  const groupedShortcuts = useMemo(() => groupKeymapActions(filteredKeymapActions), [filteredKeymapActions]);
+  const matchCount = filteredKeymapActions.length + filteredSlashCommands.length;
+
+  async function copySlashCommand(command: string) {
+    await copyTextToClipboard(command);
+    setCopiedCommand(command);
+    setToastOpen(false);
+    window.setTimeout(() => setToastOpen(true), 0);
+  }
+
+  return (
+    <Toast.Provider duration={2200} swipeDirection="right">
+      <PageHeader
+        action={<Badge tone="neutral">{formatMatchCount(matchCount)}</Badge>}
+        description="Search Codex keyboard shortcuts and slash commands from one screen."
+        title="Codex Cheatsheet"
+      />
+
+      <div className="board-controls">
+        <label className="search-control">
+          <span>Search cheatsheet</span>
+          <TextField.Root
+            aria-label="Search cheatsheet"
+            className="input"
+            placeholder="Search commands, bindings, contexts, and descriptions"
+            value={cheatsheetSearch}
+            onChange={(event) => setCheatsheetSearch(event.target.value)}
+          >
+            <TextField.Slot>
+              <Search size={15} />
+            </TextField.Slot>
+          </TextField.Root>
+        </label>
+      </div>
+
+      <PrimitiveTabs.Root className="cheatsheet-tabs" defaultValue="shortcuts">
+        <PrimitiveTabs.List className="cheatsheet-tab-list" aria-label="Cheatsheet sections">
+          <PrimitiveTabs.Trigger className="cheatsheet-tab-trigger" value="shortcuts">
+            <span>Keyboard shortcuts</span>
+            <Badge tone="neutral">{filteredKeymapActions.length}</Badge>
+          </PrimitiveTabs.Trigger>
+          <PrimitiveTabs.Trigger className="cheatsheet-tab-trigger" value="slash-commands">
+            <span>Slash commands</span>
+            <Badge tone="neutral">{filteredSlashCommands.length}</Badge>
+          </PrimitiveTabs.Trigger>
+        </PrimitiveTabs.List>
+
+        <PrimitiveTabs.Content className="cheatsheet-tab-content" value="shortcuts">
+          <Panel className="cheatsheet-page-panel">
+            <div className="section-heading">
+              <SectionTitle>Keyboard shortcuts</SectionTitle>
+              <Badge tone="neutral">{filteredKeymapActions.length}</Badge>
+            </div>
+            {groupedShortcuts.length === 0 ? (
+              <MutedText>No keyboard shortcuts match this search.</MutedText>
+            ) : (
+              <div className="cheatsheet-page-groups">
+                {groupedShortcuts.map(([contextLabel, actions], groupIndex) => (
+                  <section className="cheatsheet-page-group" key={contextLabel}>
+                    {groupIndex > 0 ? <Separator className="cheatsheet-group-separator" size="4" /> : null}
+                    <h3>{contextLabel}</h3>
+                    <ThemeCard className="cheatsheet-card" size="1">
+                      <Inset clip="padding-box" side="x">
+                        <Table.Root className="cheatsheet-table cheatsheet-shortcut-table" layout="fixed" size="2" variant="ghost">
+                          <Table.Header>
+                            <Table.Row>
+                              <Table.ColumnHeaderCell width="30%">Action</Table.ColumnHeaderCell>
+                              <Table.ColumnHeaderCell>Description</Table.ColumnHeaderCell>
+                              <Table.ColumnHeaderCell width="28%">Binding</Table.ColumnHeaderCell>
+                            </Table.Row>
+                          </Table.Header>
+                          <Table.Body>
+                            {actions.map((action) => (
+                              <Table.Row key={`${action.context}-${action.action}`}>
+                                <Table.RowHeaderCell>
+                                  <div className="cheatsheet-cell-main">
+                                    <span className="cheatsheet-mobile-label">Action</span>
+                                    <strong>{action.label}</strong>
+                                    <span>{action.action}</span>
+                                  </div>
+                                </Table.RowHeaderCell>
+                                <Table.Cell>
+                                  <span className="cheatsheet-mobile-label">Description</span>
+                                  <p className="cheatsheet-description">{action.description}</p>
+                                </Table.Cell>
+                                <Table.Cell>
+                                  <span className="cheatsheet-mobile-label">Binding</span>
+                                  <InlineCode className="cheatsheet-binding-code">{action.defaultBinding || "Unbound"}</InlineCode>
+                                </Table.Cell>
+                              </Table.Row>
+                            ))}
+                          </Table.Body>
+                        </Table.Root>
+                      </Inset>
+                    </ThemeCard>
+                  </section>
+                ))}
+              </div>
+            )}
+          </Panel>
+        </PrimitiveTabs.Content>
+
+        <PrimitiveTabs.Content className="cheatsheet-tab-content" value="slash-commands">
+          <Panel className="cheatsheet-page-panel">
+            <div className="section-heading">
+              <SectionTitle>Slash commands</SectionTitle>
+              <Badge tone="neutral">{filteredSlashCommands.length}</Badge>
+            </div>
+            {filteredSlashCommands.length === 0 ? (
+              <MutedText>No slash commands match this search.</MutedText>
+            ) : (
+              <ThemeCard className="cheatsheet-card" size="1">
+                <Inset clip="padding-box" side="x">
+                  <Table.Root className="cheatsheet-table cheatsheet-command-table" layout="fixed" size="2" variant="ghost">
+                    <Table.Header>
+                      <Table.Row>
+                        <Table.ColumnHeaderCell width="38%">Command</Table.ColumnHeaderCell>
+                        <Table.ColumnHeaderCell>Description</Table.ColumnHeaderCell>
+                      </Table.Row>
+                    </Table.Header>
+                    <Table.Body>
+                      {filteredSlashCommands.map((command) => (
+                        <Table.Row key={command.command}>
+                          <Table.RowHeaderCell>
+                            <span className="cheatsheet-mobile-label">Command</span>
+                            <button
+                              aria-label={`${copiedCommand === command.command ? "Copied" : "Copy"} ${command.command}`}
+                              className="cheatsheet-command-copy"
+                              onClick={() => void copySlashCommand(command.command)}
+                              title={`Copy ${command.command}`}
+                              type="button"
+                            >
+                              <InlineCode className="cheatsheet-command-code">{command.command}</InlineCode>
+                            </button>
+                          </Table.RowHeaderCell>
+                          <Table.Cell>
+                            <span className="cheatsheet-mobile-label">Description</span>
+                            <p className="cheatsheet-description">{command.description}</p>
+                          </Table.Cell>
+                        </Table.Row>
+                      ))}
+                    </Table.Body>
+                  </Table.Root>
+                </Inset>
+              </ThemeCard>
+            )}
+          </Panel>
+        </PrimitiveTabs.Content>
+      </PrimitiveTabs.Root>
+
+      <Toast.Root className="app-toast" onOpenChange={setToastOpen} open={toastOpen} type="foreground">
+        <Toast.Title className="app-toast-title">Copied slash command</Toast.Title>
+        <Toast.Description className="app-toast-description">{copiedCommand}</Toast.Description>
+      </Toast.Root>
+      <Toast.Viewport className="app-toast-viewport" />
+    </Toast.Provider>
   );
 }
 
@@ -1701,9 +1974,13 @@ function km(
   };
 }
 
-function groupKeymapActions(): [string, KeymapActionDescriptor[]][] {
+function sc(command: string, description: string): SlashCommandDescriptor {
+  return { command, description };
+}
+
+function groupKeymapActions(actions = keymapActions): [string, KeymapActionDescriptor[]][] {
   const groups = new Map<string, KeymapActionDescriptor[]>();
-  for (const action of keymapActions) {
+  for (const action of actions) {
     groups.set(action.contextLabel, [...(groups.get(action.contextLabel) ?? []), action]);
   }
   return [...groups.entries()];
@@ -1916,9 +2193,34 @@ function matchesConfigField(field: ConfigFieldDefinition, value: unknown, query:
   );
 }
 
+function matchesKeymapAction(action: KeymapActionDescriptor, query: string): boolean {
+  return matchesSearch(query, action.contextLabel, action.action, action.label, action.description, action.defaultBinding);
+}
+
+function matchesSlashCommand(command: SlashCommandDescriptor, query: string): boolean {
+  return matchesSearch(query, command.command, command.description);
+}
+
 function matchesSearch(query: string, ...values: unknown[]): boolean {
   if (!query) return true;
   return values.some((value) => searchableText(value).includes(query));
+}
+
+async function copyTextToClipboard(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.left = "-9999px";
+  textarea.style.position = "fixed";
+  document.body.append(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
 }
 
 function searchableText(value: unknown): string {

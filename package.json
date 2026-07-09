@@ -11,6 +11,8 @@
   "files": [
     "dist/",
     "apps/web/dist/",
+    "assets/",
+    "CHANGELOG.md",
     "README.md"
   ],
   "engines": {
