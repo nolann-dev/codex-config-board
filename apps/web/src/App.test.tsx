@@ -18,10 +18,60 @@ describe("App", () => {
     expect(await screen.findByText("Scanned config files")).toBeInTheDocument();
     expect(screen.getByText("/repo/service/.codex/config.toml")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Load /repo/service/.codex/config.toml" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /open cheatsheet/i })).toHaveAttribute("href", "/cheatsheet");
     expect(await screen.findByRole("cell", { name: "gpt-5.5" })).toBeInTheDocument();
     expect((await screen.findAllByRole("cell", { name: "workspace-write" })).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: /edit user config/i })).toHaveAttribute("href", expect.stringContaining("/edit"));
     expect(screen.getByRole("link", { name: /edit project config/i })).toHaveAttribute("href", expect.stringContaining("/edit"));
+  });
+
+  test("shows a top loading indicator while config data loads", async () => {
+    mockApi({ delayMs: 40 });
+
+    renderApp();
+
+    expect(screen.getByRole("status", { name: "Loading config" })).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.queryByRole("status", { name: "Loading config" })).not.toBeInTheDocument();
+    });
+  });
+
+  test("shows searchable keyboard shortcuts and slash commands on the cheatsheet page", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    window.history.pushState({}, "", "/cheatsheet");
+    mockApi();
+
+    renderApp();
+
+    expect(await screen.findByRole("heading", { name: "Codex Cheatsheet" })).toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "Primary" })).getByRole("link", { name: /cheatsheet/i })).toHaveClass(
+      "active",
+    );
+    expect(screen.getByRole("tab", { name: /keyboard shortcuts/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /slash commands/i })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByText("Submit")).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Search cheatsheet"), "statusline");
+
+    expect(screen.queryByText("Submit")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: /slash commands/i }));
+
+    expect(screen.getByText("/statusline")).toBeInTheDocument();
+    expect(screen.getByText("Configure TUI status-line fields interactively.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Copy /statusline" }));
+
+    expect(writeText).toHaveBeenCalledWith("/statusline");
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Copied /statusline" })).toBeInTheDocument();
+    });
+    expect(screen.getByText("Copied slash command")).toBeInTheDocument();
   });
 
   test("shows backup history and restores a selected backup", async () => {
@@ -131,8 +181,8 @@ describe("App", () => {
     expect(screen.queryByLabelText("Status line: tokens-used")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Status line: session-duration")).not.toBeInTheDocument();
     expect(screen.getByText("Keymap shortcuts")).toBeInTheDocument();
-    expect(screen.getByText("Open transcript")).toBeInTheDocument();
-    expect(screen.getByText("Delete previous word")).toBeInTheDocument();
+    expect(screen.getAllByText("Open transcript").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Delete previous word").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("Notification method").tagName).not.toBe("SELECT");
 
     await user.click(screen.getByLabelText("Notification method"));
@@ -363,8 +413,11 @@ function renderApp() {
   );
 }
 
-function mockApi() {
+function mockApi(options: { delayMs?: number } = {}) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (options.delayMs) {
+        await new Promise((resolve) => setTimeout(resolve, options.delayMs));
+      }
       const url = String(input);
       if (url.includes("/api/session")) {
         return jsonResponse({ codexHome: "/Users/me/.codex", backupDir: "/Users/me/.codex/backups" });

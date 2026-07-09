@@ -4,6 +4,8 @@ A local web board for inspecting and editing Codex configuration files.
 
 cxcg runs a local API and React UI for managing `config.toml` files used by Codex. It is designed for fast local workflows: scan config files, inspect effective values, edit common fields through forms, keep raw TOML available, and restore from backups when needed.
 
+![cxcg cheatsheet screen](assets/cheatsheet-tabs.png)
+
 ## Quick Start
 
 Run the app without cloning this repo:
@@ -45,6 +47,8 @@ The app is local-first and binds to `127.0.0.1` by default.
 - Scan for Codex config files, including user config, profile configs, system config, and project `.codex/config.toml`.
 - Inspect loaded config layers and effective merged values.
 - Search across board config files, layers, and effective values.
+- Search Codex keyboard shortcuts and slash commands from a dedicated cheatsheet screen.
+- Copy slash commands directly from the cheatsheet with an in-app success notification.
 - Edit common Codex settings with form controls backed by TOML output.
 - Search fields on the Edit config page.
 - Manage TUI settings, status-line items, terminal title items, notifications, theme, and keymap bindings.
