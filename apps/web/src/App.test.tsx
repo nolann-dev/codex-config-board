@@ -81,7 +81,7 @@ describe("App", () => {
     renderApp();
 
     expect(await screen.findByText("Backup history")).toBeInTheDocument();
-    expect(screen.getByText("/Users/me/.codex/backups/config.toml.20260705.bak")).toBeInTheDocument();
+    expect(await screen.findByText("/Users/me/.codex/backups/config.toml.20260705.bak")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Restore backup from Jul 5, 2026, 10:30 AM" }));
 
@@ -152,7 +152,9 @@ describe("App", () => {
 
     await screen.findByRole("heading", { name: "Edit config" });
 
-    expect(screen.getByLabelText("Model provider")).toBeDisabled();
+    await waitFor(() => {
+      expect(screen.getByLabelText("Model provider")).toBeDisabled();
+    });
     expect(screen.getByText(/Set this in user-level config/)).toBeInTheDocument();
   });
 
